@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Students - Edugram Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<nav class="navbar navbar-expand-md navbar-dark bg-primary">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="index.html">Edugram Admin</a>
+  </div>
+</nav>
+</main>
+<main class="container py-4">
+  <h3>Students</h3>
+  <div class="row mb-3">
+    <div class="col-12 col-md-6">
+      <input id="search" class="form-control" placeholder="Search name or email">
+    </div>
+    <div class="col-12 col-md-6 text-end">
+      <div id="pagination" class="btn-group" role="group"></div>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-striped" id="students-table">
+      <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Class</th><th>Roll</th><th>Tests Attended</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</main>
+<script>
+const API = '../api/index.php?route=';
+let page = 1, per_page = 20;
+async function load(){
+  const q = document.getElementById('search').value.trim();
+  const res = await (await fetch(`${API}students&q=${encodeURIComponent(q)}&page=${page}&per_page=${per_page}`)).json();
+  const tbody = document.querySelector('#students-table tbody');
+  tbody.innerHTML = '';
+  res.data.forEach((s,i)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${(page-1)*per_page + i + 1}</td><td>${s.student_name||''}</td><td>${s.email||''}</td><td>${s.class||''}</td><td>${s.roll_no||''}</td><td>${s.tests_attended||0}</td>`;
+    tbody.appendChild(tr);
+  });
+  renderPagination(res.page);
+}
+
+function renderPagination(current){
+  const pg = document.getElementById('pagination'); pg.innerHTML='';
+  const prev = document.createElement('button'); prev.className='btn btn-outline-secondary'; prev.textContent='Prev'; prev.onclick=()=>{ if(page>1){page--; load();}};
+  const next = document.createElement('button'); next.className='btn btn-outline-secondary'; next.textContent='Next'; next.onclick=()=>{ page++; load(); };
+  pg.appendChild(prev); pg.appendChild(next);
+}
+
+document.getElementById('search').addEventListener('input', ()=>{ page=1; load(); });
+load().catch(console.error);
+</script>
+</body>
+</html>
