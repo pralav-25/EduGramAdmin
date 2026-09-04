@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL UNIQUE,
   role ENUM('student','teacher','admin') NOT NULL DEFAULT 'student',
-  password VARCHAR(255) DEFAULT NULL,
+  password VARCHAR(255) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -79,12 +79,12 @@ CREATE TABLE IF NOT EXISTS game4_scores (
 );
 
 -- users sample data
--- For demo the seeded users use 'password' as their password. Replace with hashed passwords in production.
+-- Demo users use the password "password", stored as a bcrypt hash.
 INSERT INTO users (name,email,role,password) VALUES
-('Alice Student','alice@example.com','student','password'),
-('Bob Student','bob@example.com','student','password'),
-('Carol Teacher','carol@example.com','teacher','password'),
-('Dave Admin','dave@example.com','admin','password');
+('Alice Student','alice@example.com','student','$2y$10$O42LNxOf94K5mOh.ekpp.egfGcBOqTWabfHa61xkbU1pyqjNIgqFu'),
+('Bob Student','bob@example.com','student','$2y$10$O42LNxOf94K5mOh.ekpp.egfGcBOqTWabfHa61xkbU1pyqjNIgqFu'),
+('Carol Teacher','carol@example.com','teacher','$2y$10$O42LNxOf94K5mOh.ekpp.egfGcBOqTWabfHa61xkbU1pyqjNIgqFu'),
+('Dave Admin','dave@example.com','admin','$2y$10$O42LNxOf94K5mOh.ekpp.egfGcBOqTWabfHa61xkbU1pyqjNIgqFu');
 
 -- students sample data (link to users)
 INSERT INTO students (user_id,class,roll_no) VALUES
