@@ -18,9 +18,13 @@ Setup
 mysql -u root -p < sql/edu_schema.sql
 ```
 
-2. Configure DB credentials
+2. Configure credentials and a JWT signing secret
 
-Either set environment variables: `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS`, `DB_PORT` or edit `api/db.php` directly.
+Set `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS`, and `DB_PORT` as needed. Also set a strong `JWT_SECRET`; login and score submission fail closed when it is missing.
+
+```bash
+export JWT_SECRET='replace-with-a-long-random-value'
+```
 
 3. Start PHP built-in server for development
 
@@ -55,12 +59,12 @@ python3 -m http.server 8080 --directory dashboard
 
 Notes & Next steps
 
-- This backend is intentionally simple and suitable for local development. For production, add authentication, input validation, and prepared statements (already used) with stricter checks.
+- This backend is intentionally simple and suitable for local development. It uses prepared statements, bcrypt password hashes, expiring JWTs, and role-aware score submission, but still requires a production security review before deployment.
 - For realtime game data, consider using a message queue or WebSockets. I can add Server-Sent Events or a simple Socket server next.
 
 Authentication & realtime
 
-- A simple login endpoint was added: `POST /index.php?route=auth/login` with JSON {"email","password"}. The seeded users use password `password` for demo. The endpoint returns a JWT token that you can include as an `Authorization: Bearer <token>` header when calling protected endpoints (e.g. posting scores).
+- A simple login endpoint is available at `POST /index.php?route=auth/login` with JSON {"email","password"}. The seeded users use password `password` for demo; the schema stores it as a bcrypt hash. The endpoint returns an expiring JWT token that you can include as an `Authorization: Bearer <token>` header when calling protected endpoints (e.g. posting scores).
 - For SSE (Server-Sent Events) you can create an `events` table to capture new score events for streaming to dashboards. Example SQL to create it:
 
 ```sql

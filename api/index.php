@@ -5,8 +5,8 @@ require_once __DIR__ . '/db.php';
 $method = $_SERVER['REQUEST_METHOD'];
 $path = isset($_SERVER['PATH_INFO']) ? trim($_SERVER['PATH_INFO'], '/') : (isset($_GET['route']) ? $_GET['route'] : '');
 
-// secret for JWT - in production place in env var
-$JWT_SECRET = getenv('JWT_SECRET') ?: 'change_this_secret';
+// Authentication is disabled until an explicit signing secret is configured.
+$JWT_SECRET = getenv('JWT_SECRET') ?: null;
 
 // Simple router
 switch (true) {
@@ -69,12 +69,14 @@ switch (true) {
 
     // POST /auth/login -> {email, password}
     case $method === 'POST' && ($path === 'auth/login' || $path === 'auth/login/'):
+        if (!$JWT_SECRET) json_response(['error'=>'JWT_SECRET is not configured'],500);
         $input = json_decode(file_get_contents('php://input'), true);
         if (!$input || !isset($input['email']) || !isset($input['password'])) json_response(['error'=>'email and password required'],400);
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? LIMIT 1");
-        $stmt->execute([$input['email']]);
+        if (!is_string($input['email']) || !is_string($input['password'])) json_response(['error'=>'email and password must be strings'],400);
+        $stmt = $pdo->prepare("SELECT id, name, role, password FROM users WHERE email = ? LIMIT 1");
+        $stmt->execute([trim($input['email'])]);
         $user = $stmt->fetch();
-        if(!$user || $user['password'] !== $input['password']) json_response(['error'=>'invalid credentials'],401);
+        if(!$user || !password_verify($input['password'], $user['password'])) json_response(['error'=>'invalid credentials'],401);
         $payload = ['sub'=>$user['id'],'name'=>$user['name'],'role'=>$user['role'],'iat'=>time(),'exp'=>time()+60*60*24];
         $token = jwt_encode($payload, $JWT_SECRET);
         json_response(['token'=>$token,'user'=>$payload]);
@@ -100,7 +102,12 @@ switch (true) {
 
     // GET /users
     case $method === 'GET' && ($path === 'users' || $path === 'users/'):
-        $stmt = $pdo->query("SELECT u.*, COALESCE(s.id, NULL) as student_id, COALESCE(t.id, NULL) as teacher_id FROM users u LEFT JOIN students s ON s.user_id = u.id LEFT JOIN teachers t ON t.user_id = u.id ORDER BY u.name");
+        if(!$JWT_SECRET) json_response(['error'=>'JWT_SECRET is not configured'],500);
+        $token = get_bearer_token();
+        $userPayload = $token ? jwt_decode($token, $JWT_SECRET) : null;
+        if(!$userPayload) json_response(['error'=>'Authorization required'],401);
+        if(($userPayload['role'] ?? null) !== 'admin') json_response(['error'=>'Admin access required'],403);
+        $stmt = $pdo->query("SELECT u.id, u.name, u.email, u.role, u.created_at, COALESCE(s.id, NULL) as student_id, COALESCE(t.id, NULL) as teacher_id FROM users u LEFT JOIN students s ON s.user_id = u.id LEFT JOIN teachers t ON t.user_id = u.id ORDER BY u.name");
         json_response($stmt->fetchAll());
         break;
 
@@ -183,6 +190,7 @@ switch (true) {
         $table = $tableMap[$game];
 
     // require auth
+    if(!$JWT_SECRET) json_response(['error'=>'JWT_SECRET is not configured'],500);
     $token = get_bearer_token();
     $userPayload = $token ? jwt_decode($token, $JWT_SECRET) : null;
     if(!$userPayload) json_response(['error'=>'Authorization required'],401);
@@ -191,12 +199,27 @@ switch (true) {
     if (!$input) json_response(['error' => 'Invalid JSON'], 400);
 
         // expected: student_id, score, subject
-        $student_id = isset($input['student_id']) ? (int)$input['student_id'] : null;
-        $score = isset($input['score']) ? (int)$input['score'] : null;
+        $student_id = filter_var($input['student_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $score = filter_var($input['score'] ?? null, FILTER_VALIDATE_INT);
         $subject = isset($input['subject']) ? $input['subject'] : null;
 
-        if (!$student_id || $score === null) {
-            json_response(['error' => 'student_id and score are required'], 400);
+        if ($student_id === false || $score === false) {
+            json_response(['error' => 'student_id and score must be integers'], 400);
+        }
+        if ($score < 0 || $score > 100) {
+            json_response(['error' => 'score must be between 0 and 100'], 422);
+        }
+        if ($subject !== null && (!is_string($subject) || strlen($subject) > 100)) {
+            json_response(['error' => 'subject must be a string of at most 100 characters'], 422);
+        }
+
+        $role = $userPayload['role'] ?? null;
+        if ($role === 'student') {
+            $ownerStmt = $pdo->prepare("SELECT id FROM students WHERE id = ? AND user_id = ?");
+            $ownerStmt->execute([$student_id, (int)$userPayload['sub']]);
+            if (!$ownerStmt->fetch()) json_response(['error' => 'Students may only submit their own scores'], 403);
+        } elseif (!in_array($role, ['teacher', 'admin'], true)) {
+            json_response(['error' => 'Insufficient permissions'], 403);
         }
 
         $stmt = $pdo->prepare("INSERT INTO $table (student_id, score, subject) VALUES (?, ?, ?)");
