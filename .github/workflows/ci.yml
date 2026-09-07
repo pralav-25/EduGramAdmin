@@ -1,0 +1,52 @@
+name: Validate PHP and MySQL API
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: local-test-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -plocal-test-password"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: edu
+      DB_USER: root
+      DB_PASS: local-test-password
+      JWT_SECRET: integration-only-secret-at-least-32-characters
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PHP database extension
+        run: sudo apt-get update && sudo apt-get install -y php-cli php-mysql mysql-client
+      - name: Check syntax and token validation
+        run: |
+          find api tests -name '*.php' -print0 | xargs -0 -n1 php -l
+          php tests/helpers_test.php
+      - name: Import isolated fixtures
+        env:
+          MYSQL_PWD: local-test-password
+        run: mysql -h 127.0.0.1 -u root < sql/edu_schema.sql
+      - name: Start API
+        run: |
+          php -S 127.0.0.1:8000 -t . > /tmp/edugram-php.log 2>&1 &
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent 'http://127.0.0.1:8000/api/index.php?route=games' > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/edugram-php.log
+          exit 1
+      - run: python3 tests/integration.py
+      - name: PHP log on failure
+        if: failure()
+        run: cat /tmp/edugram-php.log || true
