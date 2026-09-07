@@ -7,6 +7,12 @@ $path = isset($_SERVER['PATH_INFO']) ? trim($_SERVER['PATH_INFO'], '/') : (isset
 
 // Authentication is disabled until an explicit signing secret is configured.
 $JWT_SECRET = getenv('JWT_SECRET') ?: null;
+if ($JWT_SECRET !== null && strlen($JWT_SECRET) < 32) $JWT_SECRET = null;
+
+set_exception_handler(function (Throwable $error) {
+    error_log('API error: ' . $error->getMessage());
+    json_response(['error' => 'Unable to complete the request'], 500);
+});
 
 // Simple router
 switch (true) {
@@ -21,11 +27,11 @@ switch (true) {
         if ($q !== '') {
             $like = "%{$q}%";
             $stmt = $pdo->prepare("SELECT s.id, u.name AS student_name, u.email, s.class, s.roll_no, COALESCE(st.tests_attended,0) AS tests_attended FROM students s JOIN users u ON u.id = s.user_id LEFT JOIN student_test_counts st ON st.student_id = s.id WHERE u.name LIKE ? OR u.email LIKE ? ORDER BY tests_attended DESC LIMIT ? OFFSET ?");
-            $stmt->execute([$like, $like, $per, $offset]);
+            execute_paginated($stmt, [$like, $like], $per, $offset);
             $rows = $stmt->fetchAll();
         } else {
             $stmt = $pdo->prepare("SELECT s.id, u.name AS student_name, u.email, s.class, s.roll_no, COALESCE(st.tests_attended,0) AS tests_attended FROM students s JOIN users u ON u.id = s.user_id LEFT JOIN student_test_counts st ON st.student_id = s.id ORDER BY tests_attended DESC LIMIT ? OFFSET ?");
-            $stmt->execute([$per, $offset]);
+            execute_paginated($stmt, [], $per, $offset);
             $rows = $stmt->fetchAll();
         }
         json_response(['page'=>$page,'per_page'=>$per,'data'=>$rows]);
@@ -51,11 +57,11 @@ switch (true) {
         if ($q !== '') {
             $like = "%{$q}%";
             $stmt = $pdo->prepare("SELECT t.id, u.name, u.email, t.subject, t.department FROM teachers t JOIN users u ON u.id = t.user_id WHERE u.name LIKE ? OR u.email LIKE ? ORDER BY u.name LIMIT ? OFFSET ?");
-            $stmt->execute([$like,$like,$per,$offset]);
+            execute_paginated($stmt, [$like, $like], $per, $offset);
             $rows = $stmt->fetchAll();
         } else {
             $stmt = $pdo->prepare("SELECT t.id, u.name, u.email, t.subject, t.department FROM teachers t JOIN users u ON u.id = t.user_id ORDER BY u.name LIMIT ? OFFSET ?");
-            $stmt->execute([$per,$offset]);
+            execute_paginated($stmt, [], $per, $offset);
             $rows = $stmt->fetchAll();
         }
         json_response(['page'=>$page,'per_page'=>$per,'data'=>$rows]);
@@ -70,14 +76,14 @@ switch (true) {
     // POST /auth/login -> {email, password}
     case $method === 'POST' && ($path === 'auth/login' || $path === 'auth/login/'):
         if (!$JWT_SECRET) json_response(['error'=>'JWT_SECRET is not configured'],500);
-        $input = json_decode(file_get_contents('php://input'), true);
+        $input = read_json_input();
         if (!$input || !isset($input['email']) || !isset($input['password'])) json_response(['error'=>'email and password required'],400);
         if (!is_string($input['email']) || !is_string($input['password'])) json_response(['error'=>'email and password must be strings'],400);
         $stmt = $pdo->prepare("SELECT id, name, role, password FROM users WHERE email = ? LIMIT 1");
         $stmt->execute([trim($input['email'])]);
         $user = $stmt->fetch();
         if(!$user || !password_verify($input['password'], $user['password'])) json_response(['error'=>'invalid credentials'],401);
-        $payload = ['sub'=>$user['id'],'name'=>$user['name'],'role'=>$user['role'],'iat'=>time(),'exp'=>time()+60*60*24];
+        $payload = ['sub'=>(int)$user['id'],'name'=>$user['name'],'role'=>$user['role'],'iat'=>time(),'exp'=>time()+60*60*24];
         $token = jwt_encode($payload, $JWT_SECRET);
         json_response(['token'=>$token,'user'=>$payload]);
         break;
@@ -113,7 +119,7 @@ switch (true) {
 
     // GET /leaderboard (top scores across all games)
     case $method === 'GET' && ($path === 'leaderboard' || $path === 'leaderboard/'):
-        $query = "SELECT u.name AS student_name, g.game_name, gs.score, gs.played_at FROM (
+        $query = "SELECT u.name AS student_name, gs.game_name, gs.score, gs.played_at FROM (
             SELECT student_id, score, played_at, 'Game 1' as game_name FROM game1_scores
             UNION ALL
             SELECT student_id, score, played_at, 'Game 2' as game_name FROM game2_scores
@@ -195,7 +201,7 @@ switch (true) {
     $userPayload = $token ? jwt_decode($token, $JWT_SECRET) : null;
     if(!$userPayload) json_response(['error'=>'Authorization required'],401);
 
-    $input = json_decode(file_get_contents('php://input'), true);
+    $input = read_json_input();
     if (!$input) json_response(['error' => 'Invalid JSON'], 400);
 
         // expected: student_id, score, subject
