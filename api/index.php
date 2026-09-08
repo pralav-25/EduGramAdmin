@@ -20,21 +20,25 @@ switch (true) {
     case $method === 'GET' && ($path === 'students' || $path === 'students/'):
         // params: q (search name/email), page, per_page
         $q = isset($_GET['q']) ? trim($_GET['q']) : '';
-        $page = max(1, (int)($_GET['page'] ?? 1));
+        $page = max(1, min(1000000, (int)($_GET['page'] ?? 1)));
         $per = max(5, min(200, (int)($_GET['per_page'] ?? 20)));
         $offset = ($page-1)*$per;
 
         if ($q !== '') {
             $like = "%{$q}%";
-            $stmt = $pdo->prepare("SELECT s.id, u.name AS student_name, u.email, s.class, s.roll_no, COALESCE(st.tests_attended,0) AS tests_attended FROM students s JOIN users u ON u.id = s.user_id LEFT JOIN student_test_counts st ON st.student_id = s.id WHERE u.name LIKE ? OR u.email LIKE ? ORDER BY tests_attended DESC LIMIT ? OFFSET ?");
+            $stmt = $pdo->prepare("SELECT s.id, u.name AS student_name, u.email, s.class, s.roll_no, COALESCE(st.tests_attended,0) AS tests_attended FROM students s JOIN users u ON u.id = s.user_id LEFT JOIN student_test_counts st ON st.student_id = s.id WHERE u.name LIKE ? OR u.email LIKE ? ORDER BY tests_attended DESC, s.id ASC LIMIT ? OFFSET ?");
             execute_paginated($stmt, [$like, $like], $per, $offset);
             $rows = $stmt->fetchAll();
         } else {
-            $stmt = $pdo->prepare("SELECT s.id, u.name AS student_name, u.email, s.class, s.roll_no, COALESCE(st.tests_attended,0) AS tests_attended FROM students s JOIN users u ON u.id = s.user_id LEFT JOIN student_test_counts st ON st.student_id = s.id ORDER BY tests_attended DESC LIMIT ? OFFSET ?");
+            $stmt = $pdo->prepare("SELECT s.id, u.name AS student_name, u.email, s.class, s.roll_no, COALESCE(st.tests_attended,0) AS tests_attended FROM students s JOIN users u ON u.id = s.user_id LEFT JOIN student_test_counts st ON st.student_id = s.id ORDER BY tests_attended DESC, s.id ASC LIMIT ? OFFSET ?");
             execute_paginated($stmt, [], $per, $offset);
             $rows = $stmt->fetchAll();
         }
-        json_response(['page'=>$page,'per_page'=>$per,'data'=>$rows]);
+        $countSql = "SELECT COUNT(*) FROM students s JOIN users u ON u.id = s.user_id";
+        if ($q !== '') $countSql .= " WHERE u.name LIKE ? OR u.email LIKE ?";
+        $countStmt = $pdo->prepare($countSql);
+        $countStmt->execute($q !== '' ? [$like, $like] : []);
+        json_response(['page'=>$page,'per_page'=>$per,'total'=>(int)$countStmt->fetchColumn(),'data'=>$rows]);
         break;
 
     // GET /students/{id}
@@ -51,20 +55,24 @@ switch (true) {
     case $method === 'GET' && ($path === 'teachers' || $path === 'teachers/'):
         // params: q (search), page, per_page
         $q = isset($_GET['q']) ? trim($_GET['q']) : '';
-        $page = max(1, (int)($_GET['page'] ?? 1));
+        $page = max(1, min(1000000, (int)($_GET['page'] ?? 1)));
         $per = max(5, min(200, (int)($_GET['per_page'] ?? 20)));
         $offset = ($page-1)*$per;
         if ($q !== '') {
             $like = "%{$q}%";
-            $stmt = $pdo->prepare("SELECT t.id, u.name, u.email, t.subject, t.department FROM teachers t JOIN users u ON u.id = t.user_id WHERE u.name LIKE ? OR u.email LIKE ? ORDER BY u.name LIMIT ? OFFSET ?");
+            $stmt = $pdo->prepare("SELECT t.id, u.name, u.email, t.subject, t.department FROM teachers t JOIN users u ON u.id = t.user_id WHERE u.name LIKE ? OR u.email LIKE ? ORDER BY u.name, t.id ASC LIMIT ? OFFSET ?");
             execute_paginated($stmt, [$like, $like], $per, $offset);
             $rows = $stmt->fetchAll();
         } else {
-            $stmt = $pdo->prepare("SELECT t.id, u.name, u.email, t.subject, t.department FROM teachers t JOIN users u ON u.id = t.user_id ORDER BY u.name LIMIT ? OFFSET ?");
+            $stmt = $pdo->prepare("SELECT t.id, u.name, u.email, t.subject, t.department FROM teachers t JOIN users u ON u.id = t.user_id ORDER BY u.name, t.id ASC LIMIT ? OFFSET ?");
             execute_paginated($stmt, [], $per, $offset);
             $rows = $stmt->fetchAll();
         }
-        json_response(['page'=>$page,'per_page'=>$per,'data'=>$rows]);
+        $countSql = "SELECT COUNT(*) FROM teachers t JOIN users u ON u.id = t.user_id";
+        if ($q !== '') $countSql .= " WHERE u.name LIKE ? OR u.email LIKE ?";
+        $countStmt = $pdo->prepare($countSql);
+        $countStmt->execute($q !== '' ? [$like, $like] : []);
+        json_response(['page'=>$page,'per_page'=>$per,'total'=>(int)$countStmt->fetchColumn(),'data'=>$rows]);
         break;
 
     // GET /games

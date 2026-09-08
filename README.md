@@ -76,3 +76,9 @@ library and a complete authorization model.
 The optional `stream/sse` route expects a separately provisioned `events` table.
 It is not part of the default setup or integration checks. No realtime delivery
 service is claimed by this repository.
+
+Dashboard directories debounce searches, cancel stale responses, show errors and
+empty results, and stop pagination at the actual result count. Summary totals
+include all records; the attendance chart labels its first-page sample. Database
+text is escaped before HTML rendering. Run `node --test tests/*.test.cjs` for the
+shared UI safety and request-error checks.

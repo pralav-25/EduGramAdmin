@@ -40,3 +40,9 @@ assert request("scores/game1", {"student_id": 2, "score": 80}, token)[0] == 403
 assert request("scores/game1", {"student_id": 1, "score": 101}, token)[0] == 422
 assert request("scores/game1", {"student_id": 1, "score": 80, "subject": "Math"}, token)[0] == 201
 print("PHP/MySQL integration checks passed.")
+
+assert request("students")[1]["total"] == 2
+assert request("teachers")[1]["total"] == 1
+assert request("students&q=Alice")[1]["total"] == 1
+assert request("students&q=not-a-student")[1]["total"] == 0
+assert request("students&page=999999999999999999999999999")[0] == 200
