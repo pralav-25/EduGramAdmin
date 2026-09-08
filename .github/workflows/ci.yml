@@ -27,6 +27,10 @@ jobs:
       JWT_SECRET: integration-only-secret-at-least-32-characters
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/*.test.cjs
       - name: Install PHP database extension
         run: sudo apt-get update && sudo apt-get install -y php-cli php-mysql mysql-client
       - name: Check syntax and token validation
