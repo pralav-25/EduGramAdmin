@@ -28,6 +28,21 @@ Seeded accounts use password `password`: `alice@example.com` and
 `bob@example.com` (students), `carol@example.com` (teacher), and
 `dave@example.com` (admin). These are demonstration accounts.
 
+## Check the local database connection
+
+After importing the schema and starting the PHP server, request the public
+aggregate endpoint:
+
+```bash
+curl --fail --silent --show-error 'http://127.0.0.1:8000/api/index.php?route=stats/aggregates'
+```
+
+A successful response is a JSON array with `game_name`, `count`, and `avg_score`
+for each of the four games. This checks that PHP can query the imported tables;
+it does not test login or score-write permissions. If it fails, check the PHP
+server log, `pdo_mysql`, the exported database variables, and the schema import
+before troubleshooting the dashboard.
+
 ## API
 
 All routes use `/api/index.php?route=`; for example:
