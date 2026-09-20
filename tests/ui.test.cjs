@@ -17,3 +17,13 @@ test('failed HTTP and malformed responses do not masquerade as directory data', 
     assert.deepEqual(await requestJson('/api'), { data: [], total: 0 });
   } finally { global.fetch = original; }
 });
+
+test('directory CSV keeps Unicode, quotes, newlines and zero; escapes formulas', () => {
+  const { directoryCsv } = require('../dashboard/ui.js');
+  assert.equal(directoryCsv([{ name: 'ଓଡ଼ିଆ, "student"', score: 0 },
+    { name: '=SUM(1,2)', score: null }, { name: 'line\nbreak', score: 5 }], ['name', 'score']),
+    '"name","score"\r\n"ଓଡ଼ିଆ, ""student""","0"\r\n"\'=SUM(1,2)",""\r\n"line\nbreak","5"\r\n');
+  assert.equal(directoryCsv([], ['name']), '"name"\r\n');
+  for (const name of [' +formula', '-formula', '@formula', '\tvalue', '\rvalue'])
+    assert.ok(directoryCsv([{ name }], ['name']).includes('"\'' + name + '"'));
+});

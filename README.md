@@ -97,3 +97,11 @@ empty results, and stop pagination at the actual result count. Summary totals
 include all records; the attendance chart labels its first-page sample. Database
 text is escaped before HTML rendering. Run `node --test tests/*.test.cjs` for the
 shared UI safety and request-error checks.
+
+## Export directory results
+
+Student and teacher directories include **Export this page (CSV)**. The download
+contains the currently loaded page and respects the active search; it does not
+export hidden pages. Empty, loading, and failed results cannot be exported.
+Files use UTF-8 with a BOM, preserve quoted and multiline values, and escape
+formula-like text for spreadsheet use. No additional API request is required.
