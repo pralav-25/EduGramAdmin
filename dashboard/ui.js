@@ -52,14 +52,15 @@
         if (ownSequence !== sequence || error.name === 'AbortError') return;
         page = loadedPage;
         status.textContent = error.message; retry.hidden = false;
+        retry.onclick = () => { page = requestedPage; void load(); };
         prev.disabled = page <= 1;
       }
     }
     prev.onclick = () => { page = Math.max(1, page - 1); void load(); };
     next.onclick = () => { page += 1; void load(); };
-    retry.onclick = () => { void load(); };
     search.addEventListener('input', () => {
-      ++sequence; controller?.abort(); clearTimeout(timer); page = 1;
+      ++sequence; controller?.abort(); clearTimeout(timer); page = loadedPage = 1;
+      tbody.replaceChildren(); status.textContent = 'Loading…'; retry.hidden = true;
       prev.disabled = next.disabled = true;
       timer = setTimeout(load, 200);
     });
