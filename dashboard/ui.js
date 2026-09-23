@@ -7,7 +7,10 @@
     let data;
     try { data = await response.json(); }
     catch { throw new Error('The server returned an unreadable response. Please retry.'); }
-    if (!response.ok) throw new Error(data.error || `Request failed (${response.status}).`);
+    if (!response.ok) {
+      const message = typeof data?.error === 'string' && data.error.trim();
+      throw new Error(message || `Request failed (${response.status}).`);
+    }
     return data;
   }
   function initDirectory(route, columns) {

@@ -17,3 +17,12 @@ test('failed HTTP and malformed responses do not masquerade as directory data', 
     assert.deepEqual(await requestJson('/api'), { data: [], total: 0 });
   } finally { global.fetch = original; }
 });
+test('non-object error responses preserve the HTTP status for the user', async () => {
+  const original = global.fetch;
+  try {
+    for (const data of [null, [], 'Unavailable', { error: { detail: 'Private internals' } }]) {
+      global.fetch = async () => ({ ok: false, status: 503, json: async () => data });
+      await assert.rejects(requestJson('/api'), /^Error: Request failed \(503\)\.$/);
+    }
+  } finally { global.fetch = original; }
+});
