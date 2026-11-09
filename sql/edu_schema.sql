@@ -122,7 +122,7 @@ INSERT INTO game4_scores (student_id,score,subject) VALUES
 -- small view to count tests per student (optional)
 DROP VIEW IF EXISTS student_test_counts;
 CREATE VIEW student_test_counts AS
-SELECT s.id AS student_id, u.name AS student_name, COUNT(*) AS tests_attended
+SELECT s.id AS student_id, u.name AS student_name, COUNT(all_scores.student_id) AS tests_attended
 FROM students s
 JOIN users u ON u.id = s.user_id
 LEFT JOIN (
