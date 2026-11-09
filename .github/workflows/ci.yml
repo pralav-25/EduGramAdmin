@@ -31,6 +31,8 @@ jobs:
         with:
           node-version: 22
       - run: node --test tests/*.test.cjs
+      - name: Check attendance view edge cases
+        run: python3 -m unittest discover -s tests -v
       - name: Install PHP database extension
         run: sudo apt-get update && sudo apt-get install -y php-cli php-mysql mysql-client
       - name: Check syntax and token validation

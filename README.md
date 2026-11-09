@@ -72,6 +72,7 @@ offsets. API failures return generic JSON errors; details go to PHP's error log.
 
 ```bash
 php tests/helpers_test.php
+python3 -m unittest discover -s tests -v
 python3 tests/integration.py
 ```
 
@@ -97,3 +98,11 @@ empty results, and stop pagination at the actual result count. Summary totals
 include all records; the attendance chart labels its first-page sample. Database
 text is escaped before HTML rendering. Run `node --test tests/*.test.cjs` for the
 shared UI safety and request-error checks.
+
+The attendance-view tests execute the application's view SQL against temporary
+SQLite fixtures, including students with no scores and repeated attempts across
+all four games. They need only Python's standard library; the CI integration
+checks separately exercise the PHP API against MySQL. If updating an existing
+database, rerun the `DROP VIEW` / `CREATE VIEW student_test_counts` statements at
+the end of `sql/edu_schema.sql` to apply the corrected zero-attempt count. Avoid
+reimporting the sample inserts into an existing database.
