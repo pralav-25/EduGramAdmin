@@ -166,7 +166,10 @@ switch (true) {
         header("Connection: keep-alive");
 
         // last id seen by client (optional)
-        $lastId = isset($_GET['last_id']) ? (int)$_GET['last_id'] : 0;
+        // EventSource sends this header automatically when reconnecting.
+        $cursor = $_SERVER['HTTP_LAST_EVENT_ID'] ?? ($_GET['last_id'] ?? '0');
+        $lastId = filter_var($cursor, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+        if ($lastId === false) json_response(['error' => 'Invalid event cursor'], 400);
         $start = time();
         while (true) {
             if (connection_aborted()) break;
@@ -177,8 +180,13 @@ switch (true) {
             foreach ($rows as $r) {
                 $lastId = $r['id'];
                 echo "id: {$r['id']}\n";
-                echo "event: {$r['type']}\n";
-                echo "data: {$r['payload']}\n\n";
+                // Every payload line needs its own data field in an SSE frame.
+                $eventType = str_replace(["\r", "\n"], '', $r['type']);
+                echo "event: {$eventType}\n";
+                foreach (preg_split('/\r\n|\r|\n/', $r['payload']) as $line) {
+                    echo "data: {$line}\n";
+                }
+                echo "\n";
                 @ob_flush(); flush();
             }
             // heartbeat every 10s
