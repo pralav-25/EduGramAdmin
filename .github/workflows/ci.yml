@@ -32,7 +32,9 @@ jobs:
           node-version: 22
       - run: node --test tests/*.test.cjs
       - name: Install PHP database extension
-        run: sudo apt-get update && sudo apt-get install -y php-cli php-mysql mysql-client
+        # The runner already includes mysql; its meta package also upgrades the
+        # host server, which conflicts with the MySQL service bound to port 3306.
+        run: sudo apt-get update && sudo apt-get install -y php-cli php-mysql
       - name: Check syntax and token validation
         run: |
           find api tests -name '*.php' -print0 | xargs -0 -n1 php -l
